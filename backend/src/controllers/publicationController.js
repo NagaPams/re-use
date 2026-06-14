@@ -171,3 +171,14 @@ exports.deletePublication = async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor.' });
     }
 };
+
+exports.deletePublicationAsAdmin = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db.query('DELETE FROM Producto WHERE ID_Producto = $1 RETURNING ID_Producto', [id]);
+        if (result.rows.length === 0) return res.status(404).json({ error: 'Publicación no encontrada.' });
+        res.status(200).json({ message: 'Publicación eliminada por violación a las normas comunitarias.' });
+    } catch (error) {
+        res.status(500).json({ error: 'Error del servidor.' });
+    }
+};

@@ -4,6 +4,7 @@ const multer = require('multer');
 const path = require('path');
 const publicationController = require('../controllers/publicationController');
 const verifyToken = require('../middlewares/authMiddleware');
+const verifyModerator = require('../middlewares/roleMiddleware');
 
 // Configuración de almacenamiento local para las imágenes
 const storage = multer.diskStorage({
@@ -17,7 +18,22 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({ 
+    storage: storage,
+    limits: { 
+        fileSize: 5 * 1024 * 1024 // Límite estricto de 5 Megabytes
+    },
+    fileFilter: (req, file, cb) => {
+        // Solo permitir formatos de imagen seguros
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (allowedMimeTypes.includes(file.mimetype)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Formato inválido. Solo se permiten imágenes (JPG, PNG, WEBP).'));
+        }
+    }
+});
+
 
 // Rutas
 // GET /api/publications (Pública, cualquiera puede ver el catálogo)
@@ -26,12 +42,14 @@ router.get('/', publicationController.getPublications);
 // POST /api/publications (Protegida, solo usuarios verificados pueden publicar)
 router.post('/', verifyToken, upload.single('imagen'), publicationController.createPublication);
 
-// Mis publicaciones (debe ir ANTES de /:id para que Express no confunda "my" con un ID dinámico)
+// Mis publicaciones 
 router.get('/my', verifyToken, publicationController.getMyPublications);
 
 // Detalle, actualización y eliminación
 router.get('/:id', publicationController.getPublicationById);
 router.put('/:id', verifyToken, publicationController.updatePublication);
 router.delete('/:id', verifyToken, publicationController.deletePublication);
+// DELETE /api/publications/admin/:id
+router.delete('/admin/:id', verifyToken, verifyModerator, publicationController.deletePublicationAsAdmin);
 
 module.exports = router;

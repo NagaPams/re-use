@@ -117,12 +117,9 @@ exports.login = async (req, res) => {
 
         // 4. Generar el JWT de acceso principal (Sesión)
         const token = jwt.sign(
-            { 
-                id: user.id_usuario, 
-                correo: user.correo_institucional 
-            }, 
+            { id: user.id_usuario, correo: user.correo_institucional, rol: user.rol },
             process.env.JWT_SECRET, 
-            { expiresIn: '7d' } // Duración de la sesión (ej. 7 días)
+            { expiresIn: '7d' }
         );
 
         // 5. Responder con el token y los datos del perfil (excluyendo datos sensibles)

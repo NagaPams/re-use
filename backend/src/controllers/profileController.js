@@ -17,8 +17,11 @@ exports.getProfile = async (req, res) => {
         }
 
         const user = result.rows[0];
+        // Nuevo query: Calcular el promedio real
+        const repResult = await db.query('SELECT AVG(Estrellas) as promedio FROM Reputacion WHERE ID_Usuario = $1', [userId]);
+        const reputacionReal = repResult.rows[0].promedio ? parseFloat(repResult.rows[0].promedio).toFixed(1) : 0;
 
-        // Simulamos la reputación y el avatar como indica tu documento de endpoints
+        // Simulamos la reputación y el avatar
         res.status(200).json({
             id: user.id_usuario,
             nombre: user.nombre,
@@ -26,7 +29,7 @@ exports.getProfile = async (req, res) => {
             correo: user.correo_institucional,
             telefono: user.telefono,
             fecha_registro: user.fecha_registro,
-            reputacion: 5.0, // Pendiente: Calcular desde la tabla Reputacion
+            reputacion: reputacionReal, // <- Ahora es un dato matemático real de la BD
             avatarUrl: null  // Pendiente: Implementar carga de imágenes
         });
 

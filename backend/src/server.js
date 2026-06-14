@@ -13,6 +13,7 @@ const path = require('path');
 const publicationRoutes = require('./routes/publicationRoutes');
 const chatRoutes = require('./routes/chatRoutes'); 
 const savedRoutes = require('./routes/savedRoutes');
+const transactionRoutes = require('./routes/transactionRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -58,6 +59,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/publications', publicationRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/saved', savedRoutes);
+app.use('/api/transactions', transactionRoutes);
 
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'OK', message: 'Servidor RE-USE funcionando con Postgres' });
