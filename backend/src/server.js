@@ -9,6 +9,8 @@ const pool = require('./config/db');
 // Importar rutas
 const authRoutes = require('./routes/authRoutes');
 const profileRoutes = require('./routes/profileRoutes');
+const path = require('path'); 
+const publicationRoutes = require('./routes/publicationRoutes'); 
 
 const app = express();
 const server = http.createServer(app);
@@ -18,10 +20,12 @@ const io = new Server(server, {
 
 app.use(cors());
 app.use(express.json()); 
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Montar rutas
 app.use('/api/auth', authRoutes);
 app.use('/api/profile', profileRoutes);
+app.use('/api/publications', publicationRoutes);
 
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'OK', message: 'Servidor RE-USE funcionando con Postgres' });
