@@ -117,3 +117,17 @@ exports.updatePassword = async (req, res) => {
         res.status(500).json({ error: 'Error interno del servidor.' });
     }
 };
+
+exports.updateAvatar = async (req, res) => {
+    const userId = req.user.id;
+    const avatarPath = req.file ? `/uploads/${req.file.filename}` : null;
+
+    if (!avatarPath) return res.status(400).json({ error: 'No se subió ninguna imagen.' });
+
+    try {
+        await db.query('UPDATE Usuario SET AvatarUrl = $1 WHERE ID_Usuario = $2', [avatarPath, userId]);
+        res.status(200).json({ avatarUrl: avatarPath });
+    } catch (error) {
+        res.status(500).json({ error: 'Error al actualizar el avatar.' });
+    }
+};

@@ -5,6 +5,7 @@ const path = require('path');
 const publicationController = require('../controllers/publicationController');
 const verifyToken = require('../middlewares/authMiddleware');
 const verifyModerator = require('../middlewares/roleMiddleware');
+const upload = require('../middlewares/uploadMiddleware');
 
 // Configuración de almacenamiento local para las imágenes
 const storage = multer.diskStorage({
@@ -15,22 +16,6 @@ const storage = multer.diskStorage({
         // Renombramos el archivo con la fecha actual para evitar duplicados
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, uniqueSuffix + path.extname(file.originalname));
-    }
-});
-
-const upload = multer({ 
-    storage: storage,
-    limits: { 
-        fileSize: 5 * 1024 * 1024 // Límite estricto de 5 Megabytes
-    },
-    fileFilter: (req, file, cb) => {
-        // Solo permitir formatos de imagen seguros
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (allowedMimeTypes.includes(file.mimetype)) {
-            cb(null, true);
-        } else {
-            cb(new Error('Formato inválido. Solo se permiten imágenes (JPG, PNG, WEBP).'));
-        }
     }
 });
 
