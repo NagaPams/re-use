@@ -39,11 +39,13 @@ exports.getPublications = async (req, res) => {
 
     try {
         let query = `
-            SELECT p.ID_Producto, p.Titulo, p.Precio, p.Estado, p.Tipo_Adquisicion, p.Fotos, 
-                   c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional 
+            SELECT p.ID_Producto, p.Titulo, p.Descripcion, p.Precio, p.Estado, p.Tipo_Adquisicion, p.Fotos, p.Stock,
+                   c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional,
+                   COALESCE(r.Reputacion, 5.0) as Reputacion_Vendedor
             FROM Producto p
             JOIN Categoria c ON p.ID_Categoria = c.ID_Categoria
             JOIN Usuario u ON p.ID_Usuario = u.ID_Usuario
+            LEFT JOIN (SELECT ID_Usuario, AVG(Estrellas) as Reputacion FROM Reputacion GROUP BY ID_Usuario) r ON u.ID_Usuario = r.ID_Usuario
             WHERE 1=1
         `;
         const values = [];
@@ -105,10 +107,12 @@ exports.getPublicationById = async (req, res) => {
     const { id } = req.params;
     try {
         const result = await db.query(
-            `SELECT p.*, c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional 
+            `SELECT p.*, c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional,
+                    COALESCE(r.Reputacion, 5.0) as Reputacion_Vendedor
              FROM Producto p 
              JOIN Categoria c ON p.ID_Categoria = c.ID_Categoria 
              JOIN Usuario u ON p.ID_Usuario = u.ID_Usuario 
+             LEFT JOIN (SELECT ID_Usuario, AVG(Estrellas) as Reputacion FROM Reputacion GROUP BY ID_Usuario) r ON u.ID_Usuario = r.ID_Usuario
              WHERE p.ID_Producto = $1`,
             [id]
         );

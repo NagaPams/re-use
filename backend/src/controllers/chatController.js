@@ -14,10 +14,10 @@ exports.createChat = async (req, res) => {
         if (productCheck.rows.length === 0) return res.status(404).json({ error: 'Artículo no encontrado.' });
         if (productCheck.rows[0].id_usuario === userId) return res.status(400).json({ error: 'No puedes iniciar un chat contigo mismo.' });
 
-        // 2. Persistir el mensaje en la Base de Datos (Transacción ACID)
-        const insertMsg = await db.query(
-            'INSERT INTO Mensaje (Texto, ID_Chat, ID_Usuario_Emisor) VALUES ($1, $2, $3) RETURNING ID_Mensaje, Texto, Marca_de_tiempo',
-            [text, chatId, senderId] // <- Añadido senderId
+        // 2. Verificar si el chat ya existe
+        const chatExistente = await db.query(
+            'SELECT ID_Chat FROM Chat WHERE ID_Usuario_Inicia = $1 AND ID_Producto = $2',
+            [userId, articleId]
         );
 
         if (chatExistente.rows.length > 0) {
@@ -70,8 +70,8 @@ exports.sendMessage = async (req, res) => {
 
         // 2. Persistir el mensaje en la Base de Datos (Transacción ACID)
         const insertMsg = await db.query(
-            'INSERT INTO Mensaje (Texto, ID_Chat) VALUES ($1, $2) RETURNING ID_Mensaje, Texto, Marca_de_tiempo',
-            [text, chatId]
+            'INSERT INTO Mensaje (Texto, ID_Chat, ID_Usuario_Emisor) VALUES ($1, $2, $3) RETURNING ID_Mensaje, Texto, Marca_de_tiempo',
+            [text, chatId, senderId]
         );
 
         const newMessage = insertMsg.rows[0];
