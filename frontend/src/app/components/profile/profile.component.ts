@@ -272,7 +272,10 @@ import { MockDataService, Article } from '../../services/mock-data.service';
 
             <div class="pub-actions">
               <button [routerLink]="['/edit-publication', item.id]" class="btn-secondary btn-edit">
-                Editar Publicación
+                Editar
+              </button>
+              <button type="button" (click)="onDeletePublication(item.id)" class="btn-secondary btn-delete">
+                Eliminar
               </button>
             </div>
           </div>
@@ -288,11 +291,11 @@ import { MockDataService, Article } from '../../services/mock-data.service';
               <line x1="12" y1="16" x2="12" y2="12"></line>
               <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
-            <h2>¿Confirmar actualización?</h2>
+            <h2>{{ confirmModalTitle() }}</h2>
           </div>
           
           <p class="modal-body-text">
-            Se aplicarán y guardarán los cambios realizados en tu perfil de usuario. ¿Deseas continuar?
+            {{ confirmModalText() }}
           </p>
 
           <div class="modal-actions-row">
@@ -300,7 +303,7 @@ import { MockDataService, Article } from '../../services/mock-data.service';
               Cancelar
             </button>
             <button type="button" class="btn-accent" (click)="confirmUpdate()">
-              Sí, actualizar
+              {{ confirmModalBtnText() }}
             </button>
           </div>
         </div>
@@ -591,9 +594,29 @@ import { MockDataService, Article } from '../../services/mock-data.service';
     .price-val.donation { color: var(--heart-color); }
     .price-val.swap { color: var(--exchange-color); }
 
-    .btn-edit {
+    .pub-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .btn-edit, .btn-delete {
       padding: 10px 16px;
       font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: var(--border-radius-sm);
+      font-weight: 600;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-delete {
+      color: #ef4444;
+      border: 1px solid #fca5a5;
+      background: transparent;
+    }
+
+    .btn-delete:hover {
+      background-color: #fef2f2 !important;
+      border-color: #ef4444 !important;
     }
 
     /* Success toast */
@@ -739,6 +762,9 @@ export class ProfileComponent implements OnInit {
 
   // Confirmation Modal details
   showConfirmModal = signal(false);
+  confirmModalTitle = signal('¿Confirmar actualización?');
+  confirmModalText = signal('Se aplicarán y guardarán los cambios realizados en tu perfil de usuario. ¿Deseas continuar?');
+  confirmModalBtnText = signal('Sí, actualizar');
   pendingAction: (() => void) | null = null;
 
   private lastLoadedUserId: number | null | undefined = undefined;
@@ -821,6 +847,9 @@ export class ProfileComponent implements OnInit {
           this.cdr.detectChanges();
         }
       };
+      this.confirmModalTitle.set('¿Actualizar foto de perfil?');
+      this.confirmModalText.set('Se cambiará tu foto de perfil actual por la nueva imagen seleccionada. ¿Deseas continuar?');
+      this.confirmModalBtnText.set('Sí, actualizar');
       this.showConfirmModal.set(true);
     };
     reader.readAsDataURL(file);
@@ -847,6 +876,9 @@ export class ProfileComponent implements OnInit {
         this.cdr.detectChanges();
       }
     };
+    this.confirmModalTitle.set('¿Confirmar actualización?');
+    this.confirmModalText.set('Se aplicarán y guardarán los cambios realizados en tu perfil de usuario. ¿Deseas continuar?');
+    this.confirmModalBtnText.set('Sí, actualizar');
     this.showConfirmModal.set(true);
   }
 
@@ -872,6 +904,26 @@ export class ProfileComponent implements OnInit {
         this.cdr.detectChanges();
       }
     };
+    this.confirmModalTitle.set('¿Cambiar contraseña?');
+    this.confirmModalText.set('Se actualizará la contraseña de acceso a tu cuenta. ¿Deseas continuar?');
+    this.confirmModalBtnText.set('Sí, cambiar');
+    this.showConfirmModal.set(true);
+  }
+
+  onDeletePublication(articleId: string) {
+    this.pendingAction = async () => {
+      try {
+        await this.mockService.deletePublication(articleId);
+        this.triggerToast('Publicación eliminada correctamente.');
+        this.cdr.detectChanges();
+      } catch (err) {
+        alert('Error al eliminar la publicación.');
+        this.cdr.detectChanges();
+      }
+    };
+    this.confirmModalTitle.set('¿Eliminar publicación?');
+    this.confirmModalText.set('Esta acción es permanente y no se podrá recuperar el artículo. ¿Estás seguro de que deseas eliminarlo?');
+    this.confirmModalBtnText.set('Sí, eliminar');
     this.showConfirmModal.set(true);
   }
 

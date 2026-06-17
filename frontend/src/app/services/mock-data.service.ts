@@ -444,6 +444,16 @@ export class MockDataService {
     }
   }
 
+  async deletePublication(articleId: string) {
+    try {
+      await api.delete(`/api/publications/${articleId}`);
+      await this.loadPublications();
+    } catch (error) {
+      console.error('Failed to delete publication:', error);
+      throw error;
+    }
+  }
+
   async updateUserProfile(profile: Partial<UserProfile>, avatarFile?: File) {
     try {
       // Split name into nombre and apellidos for backend

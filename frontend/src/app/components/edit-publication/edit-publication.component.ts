@@ -279,9 +279,17 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
             </div>
 
             <!-- Submit buttons row -->
-            <div class="action-buttons-row">
+            <div class="action-buttons-row" [class.edit-layout]="isEditMode()">
               <button type="submit" class="btn-accent btn-large-submit">
                 {{ isEditMode() ? 'Actualizar' : 'Publicar' }}
+              </button>
+              <button 
+                *ngIf="isEditMode()" 
+                type="button" 
+                (click)="onDeleteClick($event)" 
+                class="btn-secondary btn-large-delete"
+              >
+                Eliminar Publicación
               </button>
             </div>
 
@@ -289,6 +297,33 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
 
         </div>
       </form>
+
+      <!-- Confirmation Modal -->
+      <div *ngIf="showDeleteConfirm()" class="modal-overlay">
+        <div class="confirm-modal card-premium">
+          <div class="modal-header-details">
+            <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="2.2" class="modal-warning-icon">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <h2>¿Eliminar publicación?</h2>
+          </div>
+          
+          <p class="modal-body-text">
+            Esta acción es permanente y no se podrá recuperar el artículo. ¿Estás seguro de que deseas eliminarlo?
+          </p>
+
+          <div class="modal-actions-row">
+            <button type="button" class="btn-secondary" (click)="showDeleteConfirm.set(false)">
+              Cancelar
+            </button>
+            <button type="button" class="btn-accent btn-danger-action" (click)="confirmDelete()">
+              Sí, eliminar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   `,
   styles: [`
@@ -597,10 +632,109 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
       margin-top: 32px;
     }
 
+    .action-buttons-row.edit-layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
     .btn-large-submit {
       width: 100%;
       padding: 16px;
       font-size: 1.1rem;
+    }
+
+    .btn-large-delete {
+      width: 100%;
+      padding: 16px;
+      font-size: 1.1rem;
+      color: #ef4444;
+      border: 1px solid #fca5a5;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 600;
+      border-radius: var(--border-radius-sm);
+      transition: all var(--transition-fast);
+    }
+
+    .btn-large-delete:hover {
+      background-color: #fef2f2;
+      border-color: #ef4444;
+    }
+
+    /* Modal styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      animation: modalFadeIn 0.25s ease;
+    }
+
+    .confirm-modal {
+      width: 100%;
+      max-width: 440px;
+      padding: 32px;
+      border-radius: var(--border-radius-md);
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      animation: modalScaleIn 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .modal-header-details {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      color: var(--primary-color);
+    }
+
+    .modal-warning-icon {
+      color: var(--accent-color);
+    }
+
+    .modal-body-text {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+
+    .modal-actions-row {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+
+    .btn-danger-action {
+      background-color: #ef4444 !important;
+      color: white !important;
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    .btn-danger-action:hover {
+      background-color: #dc2626 !important;
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes modalScaleIn {
+      from { transform: scale(0.92); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
     }
   `]
 })
@@ -622,6 +756,28 @@ export class EditPublicationComponent implements OnInit {
 
   // Form states details
   articleId = signal<string | null>(null);
+  showDeleteConfirm = signal(false);
+
+  onDeleteClick(event: Event) {
+    event.preventDefault();
+    this.showDeleteConfirm.set(true);
+  }
+
+  async confirmDelete() {
+    const currentId = this.articleId();
+    if (!currentId) return;
+
+    try {
+      await this.mockService.deletePublication(currentId);
+      this.showDeleteConfirm.set(false);
+      alert('Publicación eliminada correctamente.');
+      this.router.navigate(['/profile']);
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.error || error.message || 'Error desconocido';
+      alert(`Hubo un error al eliminar la publicación: ${errMsg}`);
+    }
+  }
   
   title = '';
   category = 'Módulos y Sensores';
