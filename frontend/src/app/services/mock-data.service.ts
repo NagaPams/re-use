@@ -131,6 +131,7 @@ export class MockDataService {
         boleta: user.boleta || '',
         phone: user.telefono || '',
         reputation: 5.0,
+        avatarUrl: user.avatarUrl ? `${API_BASE_URL}${user.avatarUrl}` : undefined
       });
 
       this.connectSocket(user.id);
@@ -224,14 +225,33 @@ export class MockDataService {
           articleTitle: c.articleTitle,
           partnerName: c.partnerName,
           partnerRole: c.partnerRole,
-          messages: c.messages.map((m: any) => ({
-            sender: m.sender,
-            text: m.text,
-            time: new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            fileType: m.fileType,
-            fileUrl: m.fileUrl,
-            fileName: m.fileName
-          }))
+          messages: c.messages.map((m: any) => {
+            let parsedText = m.text;
+            let fileType = m.fileType;
+            let fileUrl = m.fileUrl;
+            let fileName = m.fileName;
+            if (m.text && m.text.startsWith('{')) {
+              try {
+                const parsed = JSON.parse(m.text);
+                if (parsed.fileUrl || parsed.fileType) {
+                  parsedText = parsed.text || '';
+                  fileType = parsed.fileType || null;
+                  fileUrl = parsed.fileUrl || null;
+                  fileName = parsed.fileName || null;
+                }
+              } catch (e) {
+                // Ignore parsing errors
+              }
+            }
+            return {
+              sender: m.sender,
+              text: parsedText,
+              time: new Date(m.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              fileType,
+              fileUrl,
+              fileName
+            };
+          })
         };
       });
       this.chats.set(formattedChats);
@@ -304,10 +324,22 @@ export class MockDataService {
     return this.savedIds().has(articleId);
   }
 
+  getCategoryId(categoryName: string): number {
+    switch (categoryName) {
+      case 'Semiconductores': return 1;
+      case 'Pasivos': return 2;
+      case 'Tarjetas de desarrollo': return 3;
+      case 'Módulos y Sensores': return 4;
+      case 'Herramientas y Equipo': return 5;
+      case 'Kits Completos': return 6;
+      default: return 1;
+    }
+  }
+
   async addPublication(article: Omit<Article, 'id' | 'sellerName' | 'sellerEmail' | 'sellerReputation' | 'images'>, imageFile?: File) {
     try {
       // Map category name to database ID
-      const catId = article.category === 'Herramientas y Equipo' ? 2 : 1;
+      const catId = this.getCategoryId(article.category);
       
       const formData = new FormData();
       formData.append('titulo', article.title);
@@ -334,19 +366,28 @@ export class MockDataService {
     }
   }
 
-  async updatePublication(articleId: string, updatedFields: Partial<Article>) {
+  async updatePublication(articleId: string, updatedFields: Partial<Article>, imageFile?: File) {
     try {
-      const catId = updatedFields.category === 'Herramientas y Equipo' ? 2 : 1;
-      const desc = updatedFields.description + (updatedFields.specifications ? ' || ' + JSON.stringify(updatedFields.specifications) : '');
+      const catId = updatedFields.category ? this.getCategoryId(updatedFields.category) : 1;
+      const desc = (updatedFields.description || '') + (updatedFields.specifications ? ' || ' + JSON.stringify(updatedFields.specifications) : '');
       
-      await api.put(`/api/publications/${articleId}`, {
-        titulo: updatedFields.title,
-        descripcion: desc,
-        precio: updatedFields.price,
-        estado: updatedFields.state,
-        tipo_adquisicion: updatedFields.acquisitionType,
-        stock: updatedFields.stock,
-        id_categoria: catId
+      const formData = new FormData();
+      if (updatedFields.title !== undefined) formData.append('titulo', updatedFields.title);
+      formData.append('descripcion', desc);
+      if (updatedFields.price !== undefined) formData.append('precio', updatedFields.price.toString());
+      if (updatedFields.state !== undefined) formData.append('estado', updatedFields.state);
+      if (updatedFields.acquisitionType !== undefined) formData.append('tipo_adquisicion', updatedFields.acquisitionType);
+      if (updatedFields.stock !== undefined) formData.append('stock', updatedFields.stock.toString());
+      formData.append('id_categoria', catId.toString());
+
+      if (imageFile) {
+        formData.append('imagen', imageFile);
+      }
+      
+      await api.put(`/api/publications/${articleId}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
       });
       
       await this.loadPublications();
@@ -359,11 +400,15 @@ export class MockDataService {
   async updateUserProfile(profile: Partial<UserProfile>, avatarFile?: File) {
     try {
       // Split name into nombre and apellidos for backend
+      let nombre = undefined;
+      let apellido_paterno = undefined;
+      let apellido_materno = undefined;
+
       if (profile.name) {
         const parts = profile.name.trim().split(/\s+/);
-        let nombre = parts[0] || '';
-        let apellido_paterno = parts[1] || '';
-        let apellido_materno = parts.slice(2).join(' ') || '';
+        nombre = parts[0] || '';
+        apellido_paterno = parts[1] || '';
+        apellido_materno = parts.slice(2).join(' ') || '';
         
         if (parts.length === 4) {
           nombre = `${parts[0]} ${parts[1]}`;
@@ -374,21 +419,16 @@ export class MockDataService {
           apellido_paterno = parts[parts.length - 2];
           apellido_materno = parts[parts.length - 1];
         }
+      }
 
+      if (profile.name || profile.phone || profile.boleta) {
         await api.put('/api/profile', {
           nombre,
           apellido_paterno,
           apellido_materno,
-          telefono: profile.phone
+          telefono: profile.phone,
+          boleta: profile.boleta
         });
-      } else if (profile.phone) {
-        await api.put('/api/profile', {
-          telefono: profile.phone
-        });
-      }
-
-      if (profile.boleta) {
-        localStorage.setItem('boleta_simulated', profile.boleta);
       }
 
       if (avatarFile) {
@@ -421,7 +461,12 @@ export class MockDataService {
       const numericChatId = chatId.replace('chat_', '');
       let finalText = text;
       if (fileType) {
-        finalText = `[Adjunto: ${fileName || fileType}] ${text || ''}`.trim();
+        finalText = JSON.stringify({
+          text,
+          fileType,
+          fileUrl,
+          fileName
+        });
       }
       await api.post(`/api/chats/${numericChatId}/messages`, { text: finalText });
       await this.loadChats();

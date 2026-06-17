@@ -1,6 +1,6 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, effect, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MockDataService, Article, Specification } from '../../services/mock-data.service';
 
@@ -11,12 +11,12 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
   template: `
     <div class="edit-pub-container">
       <div class="breadcrumb">
-        <a routerLink="/profile" class="back-link">
+        <a (click)="goBack($event)" class="back-link" style="cursor: pointer;">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
-          Volver a perfil
+          Volver atrás
         </a>
       </div>
 
@@ -593,9 +593,20 @@ export class EditPublicationComponent implements OnInit {
   mockService = inject(MockDataService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
+  private cdr = inject(ChangeDetectorRef);
+
+  goBack(event: Event) {
+    event.preventDefault();
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/profile']);
+    }
+  }
 
   // Form states details
-  articleId: string | null = null;
+  articleId = signal<string | null>(null);
   
   title = '';
   category = 'Módulos y Sensores';
@@ -626,40 +637,52 @@ export class EditPublicationComponent implements OnInit {
   activeImageIndex = signal<number>(0);
   selectedFile: File | null = null;
 
+  private lastLoadedArticleId: string | null = null;
+
+  constructor() {
+    effect(() => {
+      const pubs = this.mockService.publications();
+      const id = this.articleId();
+      if (this.isEditMode() && id) {
+        if (pubs.length > 0) {
+          const art = pubs.find(p => p.id === id);
+          if (art) {
+            if (id !== this.lastLoadedArticleId) {
+              this.lastLoadedArticleId = id;
+              this.title = art.title;
+              this.category = art.category;
+              this.state = art.state;
+              this.description = art.description;
+              this.acquisitionType = art.acquisitionType;
+              this.price = art.price;
+              this.stock = art.stock;
+              this.specifications = art.specifications.length 
+                ? JSON.parse(JSON.stringify(art.specifications)) // deep copy
+                : [{ key: '', value: '' }];
+              
+              if (art.images && art.images.length > 0 && (art.images[0].startsWith('data:') || art.images[0].startsWith('http'))) {
+                this.uploadedImages.set([...art.images]);
+              } else {
+                this.uploadedImages.set([]);
+              }
+              this.activeImageIndex.set(0);
+              this.cdr.detectChanges();
+            }
+          } else {
+            // Truly not found in a populated list, redirect
+            this.router.navigate(['/profile']);
+          }
+        }
+      }
+    }, { allowSignalWrites: true });
+  }
+
   ngOnInit() {
     // Check if ID is provided in route
     const id = this.route.snapshot.paramMap.get('id');
     if (id) {
-      this.articleId = id;
+      this.articleId.set(id);
       this.isEditMode.set(true);
-      this.loadArticle(id);
-    }
-  }
-
-  loadArticle(id: string) {
-    const art = this.mockService.publications().find(p => p.id === id);
-    if (art) {
-      this.title = art.title;
-      this.category = art.category;
-      this.state = art.state;
-      this.description = art.description;
-      this.acquisitionType = art.acquisitionType;
-      this.price = art.price;
-      this.stock = art.stock;
-      this.specifications = art.specifications.length 
-        ? JSON.parse(JSON.stringify(art.specifications)) // deep copy
-        : [{ key: '', value: '' }];
-      
-      // Load existing images if they are base64 or server-uploaded ones
-      if (art.images && art.images.length > 0 && (art.images[0].startsWith('data:') || art.images[0].startsWith('http'))) {
-        this.uploadedImages.set([...art.images]);
-      } else {
-        this.uploadedImages.set([]);
-      }
-      this.activeImageIndex.set(0);
-    } else {
-      // Not found, redirect
-      this.router.navigate(['/profile']);
     }
   }
 
@@ -730,9 +753,10 @@ export class EditPublicationComponent implements OnInit {
     const finalPrice = this.acquisitionType === 'Venta' ? this.price : 0;
 
     try {
-      if (this.isEditMode() && this.articleId) {
+      const currentId = this.articleId();
+      if (this.isEditMode() && currentId) {
         // Edit mode
-        await this.mockService.updatePublication(this.articleId, {
+        await this.mockService.updatePublication(currentId, {
           title: this.title,
           category: this.category,
           state: this.state as any,
@@ -741,7 +765,7 @@ export class EditPublicationComponent implements OnInit {
           price: finalPrice,
           stock: this.stock,
           specifications: cleanSpecs
-        });
+        }, this.selectedFile || undefined);
         alert('Publicación actualizada con éxito.');
       } else {
         // Create mode

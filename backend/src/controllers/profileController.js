@@ -8,7 +8,7 @@ exports.getProfile = async (req, res) => {
 
     try {
         const result = await db.query(
-            'SELECT ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono, Fecha_Registro, Boleta FROM Usuario WHERE ID_Usuario = $1', 
+            'SELECT ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono, Fecha_Registro, Boleta, AvatarUrl FROM Usuario WHERE ID_Usuario = $1', 
             [userId]
         );
 
@@ -31,7 +31,7 @@ exports.getProfile = async (req, res) => {
             fecha_registro: user.fecha_registro,
             reputacion: reputacionReal, // <- Ahora es un dato matemático real de la BD
             boleta: user.boleta,
-            avatarUrl: null  // Pendiente: Implementar carga de imágenes
+            avatarUrl: user.avatarurl
         });
 
     } catch (error) {
@@ -41,21 +41,29 @@ exports.getProfile = async (req, res) => {
 };
 exports.updateProfile = async (req, res) => {
     const userId = req.user.id;
-    // Adaptado a tu esquema SQL actual
-    const { nombre, apellido_paterno, apellido_materno, telefono } = req.body;
+    const { nombre, apellido_paterno, apellido_materno, telefono, boleta } = req.body;
 
     try {
+        if (boleta) {
+            // Check if boleta is already in use by another user
+            const boletaCheck = await db.query('SELECT ID_Usuario FROM Usuario WHERE Boleta = $1 AND ID_Usuario != $2', [boleta, userId]);
+            if (boletaCheck.rows.length > 0) {
+                return res.status(400).json({ error: 'La boleta ya está registrada por otro usuario.' });
+            }
+        }
+
         const updateQuery = `
             UPDATE Usuario 
             SET Nombre = COALESCE($1, Nombre),
                 Apellido_Paterno = COALESCE($2, Apellido_Paterno),
                 Apellido_Materno = COALESCE($3, Apellido_Materno),
-                Telefono = COALESCE($4, Telefono)
-            WHERE ID_Usuario = $5
-            RETURNING ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono;
+                Telefono = COALESCE($4, Telefono),
+                Boleta = COALESCE($5, Boleta)
+            WHERE ID_Usuario = $6
+            RETURNING ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono, Boleta;
         `;
         
-        const result = await db.query(updateQuery, [nombre, apellido_paterno, apellido_materno, telefono, userId]);
+        const result = await db.query(updateQuery, [nombre, apellido_paterno, apellido_materno, telefono, boleta, userId]);
 
         if (result.rows.length === 0) {
             return res.status(404).json({ error: 'Usuario no encontrado.' });
@@ -70,7 +78,8 @@ exports.updateProfile = async (req, res) => {
                 nombre: updatedUser.nombre,
                 apellidos: `${updatedUser.apellido_paterno} ${updatedUser.apellido_materno}`,
                 correo: updatedUser.correo_institucional,
-                telefono: updatedUser.telefono
+                telefono: updatedUser.telefono,
+                boleta: updatedUser.boleta
             }
         });
 

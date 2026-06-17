@@ -728,7 +728,7 @@ export class CatalogComponent implements OnInit {
         if (tab === 'Compuertas lógicas' && item.category !== 'Semiconductores') return false; // In electronic logicgates are semiconductors
         if (tab === 'Resistencias' && item.category !== 'Pasivos') return false; // Resistances are passive
         if (tab === 'Cables' && item.category !== 'Kits Completos' && !item.title.toLowerCase().includes('cable')) return false;
-        if (tab === 'Dispositivos' && (item.category === 'Pasivos' || item.category === 'Semiconductores')) return false;
+        if (tab === 'Dispositivos' && item.category !== 'Semiconductores' && item.category !== 'Módulos y Sensores') return false;
       }
 
       // 3. Sidebar Category Filter

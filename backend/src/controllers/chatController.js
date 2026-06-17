@@ -136,7 +136,7 @@ exports.getUserChats = async (req, res) => {
             const partnerName = isComprador 
                 ? `${row.vendedor_nombre} ${row.vendedor_apellido}`
                 : `${row.comprador_nombre} ${row.comprador_apellido}`;
-            const partnerRole = isComprador ? 'Vendedor' : 'Comprador';
+            const partnerRole = isComprador ? 'Vendedor' : 'Cliente';
 
             // 3. Obtener el historial de mensajes
             const msgQuery = `

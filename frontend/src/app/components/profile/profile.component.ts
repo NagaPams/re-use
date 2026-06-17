@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, effect, ChangeDetectorRef } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -189,12 +189,15 @@ import { MockDataService, Article } from '../../services/mock-data.service';
 
         <div class="pubs-list">
           <div *ngFor="let item of userPublications()" class="pub-row card-premium">
-            <div class="pub-img-placeholder">
-              <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                <polyline points="21 15 16 10 5 21"></polyline>
-              </svg>
+            <div class="pub-img-placeholder" [routerLink]="['/product', item.id]" style="cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <img *ngIf="item.images && item.images[0] && (item.images[0].startsWith('data:') || item.images[0].startsWith('http')); else profileDefaultSvg" [src]="item.images[0]" style="width: 100%; height: 100%; object-fit: cover;" alt="Foto del componente" />
+              <ng-template #profileDefaultSvg>
+                <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                  <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                  <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+              </ng-template>
             </div>
 
             <div class="pub-main-info">
@@ -676,6 +679,7 @@ import { MockDataService, Article } from '../../services/mock-data.service';
 })
 export class ProfileComponent {
   mockService = inject(MockDataService);
+  private cdr = inject(ChangeDetectorRef);
 
   // Form Fields details
   name = '';
@@ -694,13 +698,25 @@ export class ProfileComponent {
   showConfirmModal = signal(false);
   pendingAction: (() => void) | null = null;
 
+  private lastLoadedUserId: number | null | undefined = undefined;
+
   constructor() {
-    const user = this.mockService.currentUser();
-    if (user) {
-      this.name = user.name;
-      this.boleta = user.boleta;
-      this.phone = user.phone;
-    }
+    effect(() => {
+      const user = this.mockService.currentUser();
+      if (user && user.id !== this.lastLoadedUserId) {
+        this.lastLoadedUserId = user.id;
+        this.name = user.name;
+        this.boleta = user.boleta;
+        this.phone = user.phone;
+        this.cdr.detectChanges();
+      } else if (!user) {
+        this.lastLoadedUserId = null;
+        this.name = '';
+        this.boleta = '';
+        this.phone = '';
+        this.cdr.detectChanges();
+      }
+    }, { allowSignalWrites: true });
   }
 
   // Calculate publications belonging to this user
@@ -728,8 +744,10 @@ export class ProfileComponent {
         try {
           await this.mockService.updateUserProfile({}, file);
           this.triggerToast('Foto de perfil actualizada correctamente.');
+          this.cdr.detectChanges();
         } catch (err) {
           alert('Error al actualizar el avatar.');
+          this.cdr.detectChanges();
         }
       };
       this.showConfirmModal.set(true);
@@ -752,8 +770,10 @@ export class ProfileComponent {
           phone: this.phone
         });
         this.triggerToast('Datos personales actualizados correctamente.');
+        this.cdr.detectChanges();
       } catch (err) {
         alert('Error al actualizar el perfil.');
+        this.cdr.detectChanges();
       }
     };
     this.showConfirmModal.set(true);
@@ -775,8 +795,10 @@ export class ProfileComponent {
         this.newPassword = '';
         this.confirmPassword = '';
         this.triggerToast('Contraseña actualizada correctamente.');
+        this.cdr.detectChanges();
       } catch (err: any) {
         alert(err.error || 'La contraseña actual es incorrecta.');
+        this.cdr.detectChanges();
       }
     };
     this.showConfirmModal.set(true);

@@ -130,6 +130,7 @@ exports.updatePublication = async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
     const { titulo, descripcion, precio, estado, tipo_adquisicion, stock, id_categoria } = req.body;
+    const fotoPath = req.file ? `/uploads/${req.file.filename}` : null;
 
     try {
         // 1. Verificar existencia y propiedad
@@ -146,11 +147,22 @@ exports.updatePublication = async (req, res) => {
                 Estado = COALESCE($4, Estado),
                 Tipo_Adquisicion = COALESCE($5, Tipo_Adquisicion),
                 Stock = COALESCE($6, Stock),
-                ID_Categoria = COALESCE($7, ID_Categoria)
-            WHERE ID_Producto = $8
+                ID_Categoria = COALESCE($7, ID_Categoria),
+                Fotos = COALESCE($8, Fotos)
+            WHERE ID_Producto = $9
             RETURNING *;
         `;
-        const result = await db.query(updateQuery, [titulo, descripcion, precio, estado, tipo_adquisicion, stock, id_categoria, id]);
+        const result = await db.query(updateQuery, [
+            titulo, 
+            descripcion, 
+            precio ? parseFloat(precio) : null, 
+            estado, 
+            tipo_adquisicion, 
+            stock ? parseInt(stock) : null, 
+            id_categoria ? parseInt(id_categoria) : null, 
+            fotoPath, 
+            id
+        ]);
         
         res.status(200).json({ message: 'Publicación actualizada', articulo: result.rows[0] });
     } catch (error) {

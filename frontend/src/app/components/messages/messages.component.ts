@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, AfterViewChecked, ViewChild, ElementRef } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, AfterViewChecked, ViewChild, ElementRef, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -601,6 +601,24 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
   activeChatId = signal<string | null>(null);
   messageText = '';
 
+  private initialLoad = true;
+
+  constructor() {
+    effect(() => {
+      const list = this.mockService.chats();
+      const activeParam = this.activeChatId();
+      if (this.initialLoad && list.length > 0) {
+        const urlParam = this.route.snapshot.queryParams['active'];
+        if (urlParam) {
+          this.activeChatId.set(urlParam);
+        } else {
+          this.activeChatId.set(list[0].id);
+        }
+        this.initialLoad = false;
+      }
+    }, { allowSignalWrites: true });
+  }
+
   // Get active chat from master list
   activeChat = computed(() => {
     const id = this.activeChatId();
@@ -624,12 +642,9 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
       const activeParam = params['active'];
       if (activeParam) {
         this.activeChatId.set(activeParam);
-      } else {
-        // Default to first chat if available
-        const list = this.mockService.chats();
-        if (list.length > 0) {
-          this.activeChatId.set(list[0].id);
-        }
+        this.initialLoad = false;
+      } else if (!this.initialLoad) {
+        this.activeChatId.set(null);
       }
     });
   }

@@ -149,7 +149,8 @@ exports.login = async (req, res) => {
                 apellidos: `${user.apellido_paterno} ${user.apellido_materno}`,
                 correo: user.correo_institucional,
                 telefono: user.telefono,
-                boleta: user.boleta
+                boleta: user.boleta,
+                avatarUrl: user.avatarurl
             }
         });
 

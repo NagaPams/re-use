@@ -32,7 +32,7 @@ router.get('/my', verifyToken, publicationController.getMyPublications);
 
 // Detalle, actualización y eliminación
 router.get('/:id', publicationController.getPublicationById);
-router.put('/:id', verifyToken, publicationController.updatePublication);
+router.put('/:id', verifyToken, upload.single('imagen'), publicationController.updatePublication);
 router.delete('/:id', verifyToken, publicationController.deletePublication);
 // DELETE /api/publications/admin/:id
 router.delete('/admin/:id', verifyToken, verifyModerator, publicationController.deletePublicationAsAdmin);

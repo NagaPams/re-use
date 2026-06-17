@@ -1,6 +1,6 @@
 import { Component, inject, signal, computed } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { MockDataService, Article } from '../../services/mock-data.service';
 
 @Component({
@@ -11,12 +11,12 @@ import { MockDataService, Article } from '../../services/mock-data.service';
     <div *ngIf="article(); else notFound" class="product-detail-container">
       <!-- Back Link / Categories -->
       <div class="breadcrumb">
-        <a routerLink="/catalog" class="back-link">
+        <a (click)="goBack($event)" class="back-link" style="cursor: pointer;">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
-          Volver al catálogo
+          Volver atrás
         </a>
         <span class="separator">/</span>
         <span class="current-category">{{ article()?.category }}</span>
@@ -235,7 +235,7 @@ import { MockDataService, Article } from '../../services/mock-data.service';
         <div class="card-premium error-card">
           <h2>Artículo no encontrado</h2>
           <p>El artículo que buscas no existe o ha sido retirado.</p>
-          <button routerLink="/catalog" class="btn-primary">Volver al catálogo</button>
+          <button (click)="goBack($event)" class="btn-primary">Volver atrás</button>
         </div>
       </div>
     </ng-template>
@@ -738,6 +738,16 @@ export class ProductDetailComponent {
   mockService = inject(MockDataService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
+
+  goBack(event: Event) {
+    event.preventDefault();
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/catalog']);
+    }
+  }
 
   // Active thumbnail gallery index
   activeImageIndex = signal<number>(0);
@@ -763,12 +773,12 @@ export class ProductDetailComponent {
     ).slice(0, 4);
   });
 
-  contactSeller() {
+  async contactSeller() {
     const current = this.article();
     if (!current) return;
 
     // Start a chat conversation
-    const chatId = this.mockService.startChat(current.id);
+    const chatId = await this.mockService.startChat(current.id);
     
     // Redirect to messages view and set target chat
     this.router.navigate(['/messages'], { queryParams: { active: chatId } });

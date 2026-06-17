@@ -49,7 +49,7 @@ export class App {
   }
 
   logout() {
-    this.mockService.currentUser.set(null);
+    this.mockService.logout();
     this.closeDropdown();
     this.router.navigate(['/login']);
   }
