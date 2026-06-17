@@ -5,8 +5,11 @@ exports.createPublication = async (req, res) => {
     const userId = req.user.id;
     const { titulo, descripcion, precio, estado, tipo_adquisicion, stock, id_categoria } = req.body;
     
-    // Si multer procesó una imagen, guardamos la ruta. Si no, queda null.
-    const fotoPath = req.file ? `/uploads/${req.file.filename}` : null;
+    // Si multer procesó imágenes, guardamos las rutas separadas por comas. Si no, queda null.
+    let fotoPath = null;
+    if (req.files && req.files.length > 0) {
+        fotoPath = req.files.map(f => `/uploads/${f.filename}`).join(',');
+    }
 
     if (!titulo || !precio || !tipo_adquisicion || !id_categoria) {
         return res.status(400).json({ error: 'Faltan campos obligatorios para publicar.' });
@@ -40,7 +43,7 @@ exports.getPublications = async (req, res) => {
     try {
         let query = `
             SELECT p.ID_Producto, p.Titulo, p.Descripcion, p.Precio, p.Estado, p.Tipo_Adquisicion, p.Fotos, p.Stock,
-                   c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional,
+                   p.ID_Usuario, c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional,
                    COALESCE(r.Reputacion, 5.0) as Reputacion_Vendedor
             FROM Producto p
             JOIN Categoria c ON p.ID_Categoria = c.ID_Categoria
@@ -108,7 +111,7 @@ exports.getPublicationById = async (req, res) => {
     try {
         const result = await db.query(
             `SELECT p.*, c.Nombre as Categoria, u.Nombre as Vendedor, u.Correo_Institucional,
-                    COALESCE(r.Reputacion, 5.0) as Reputacion_Vendedor
+                     COALESCE(r.Reputacion, 5.0) as Reputacion_Vendedor
              FROM Producto p 
              JOIN Categoria c ON p.ID_Categoria = c.ID_Categoria 
              JOIN Usuario u ON p.ID_Usuario = u.ID_Usuario 
@@ -129,38 +132,67 @@ exports.getPublicationById = async (req, res) => {
 exports.updatePublication = async (req, res) => {
     const userId = req.user.id;
     const { id } = req.params;
-    const { titulo, descripcion, precio, estado, tipo_adquisicion, stock, id_categoria } = req.body;
-    const fotoPath = req.file ? `/uploads/${req.file.filename}` : null;
+    const { titulo, descripcion, precio, estado, tipo_adquisicion, stock, id_categoria, mantener_fotos } = req.body;
 
     try {
         // 1. Verificar existencia y propiedad
-        const checkOwner = await db.query('SELECT ID_Usuario FROM Producto WHERE ID_Producto = $1', [id]);
+        const checkOwner = await db.query('SELECT * FROM Producto WHERE ID_Producto = $1', [id]);
         if (checkOwner.rows.length === 0) return res.status(404).json({ error: 'Publicación no encontrada.' });
-        if (checkOwner.rows[0].id_usuario !== userId) return res.status(403).json({ error: 'No tienes permiso para editar esta publicación.' });
+        
+        const existing = checkOwner.rows[0];
+        if (existing.id_usuario !== userId) return res.status(403).json({ error: 'No tienes permiso para editar esta publicación.' });
 
-        // 2. Actualizar datos usando COALESCE para no sobreescribir con nulos lo que no se envíe
+        let newPhotos = [];
+        if (req.files && req.files.length > 0) {
+            newPhotos = req.files.map(f => `/uploads/${f.filename}`);
+        }
+
+        let oldPhotos = [];
+        if (mantener_fotos !== undefined) {
+            if (mantener_fotos) {
+                oldPhotos = mantener_fotos.split(',').filter(f => f.trim() !== '');
+            }
+        } else {
+            // Compatibilidad hacia atrás si el cliente no envía mantener_fotos
+            if (existing.fotos) {
+                oldPhotos = existing.fotos.split(',').filter(f => f.trim() !== '');
+            }
+        }
+
+        const combinedPhotos = [...oldPhotos, ...newPhotos];
+        const fotoPath = combinedPhotos.length > 0 ? combinedPhotos.join(',') : null;
+
+        // 2. Establecer campos finales combinando lo nuevo con lo existente
+        const finalTitulo = titulo !== undefined ? titulo : existing.titulo;
+        const finalDescripcion = descripcion !== undefined ? descripcion : existing.descripcion;
+        const finalPrecio = (precio !== undefined && precio !== null && precio !== '') ? parseFloat(precio) : existing.precio;
+        const finalEstado = estado !== undefined ? estado : existing.estado;
+        const finalTipoAdquisicion = tipo_adquisicion !== undefined ? tipo_adquisicion : existing.tipo_adquisicion;
+        const finalStock = (stock !== undefined && stock !== null && stock !== '') ? parseInt(stock) : existing.stock;
+        const finalIdCategoria = (id_categoria !== undefined && id_categoria !== null && id_categoria !== '') ? parseInt(id_categoria) : existing.id_categoria;
+
         const updateQuery = `
             UPDATE Producto 
-            SET Titulo = COALESCE($1, Titulo),
-                Descripcion = COALESCE($2, Descripcion),
-                Precio = COALESCE($3, Precio),
-                Estado = COALESCE($4, Estado),
-                Tipo_Adquisicion = COALESCE($5, Tipo_Adquisicion),
-                Stock = COALESCE($6, Stock),
-                ID_Categoria = COALESCE($7, ID_Categoria),
-                Fotos = COALESCE($8, Fotos)
+            SET Titulo = $1,
+                Descripcion = $2,
+                Precio = $3,
+                Estado = $4,
+                Tipo_Adquisicion = $5,
+                Stock = $6,
+                ID_Categoria = $7,
+                Fotos = $8
             WHERE ID_Producto = $9
             RETURNING *;
         `;
         const result = await db.query(updateQuery, [
-            titulo, 
-            descripcion, 
-            precio ? parseFloat(precio) : null, 
-            estado, 
-            tipo_adquisicion, 
-            stock ? parseInt(stock) : null, 
-            id_categoria ? parseInt(id_categoria) : null, 
-            fotoPath, 
+            finalTitulo,
+            finalDescripcion,
+            finalPrecio,
+            finalEstado,
+            finalTipoAdquisicion,
+            finalStock,
+            finalIdCategoria,
+            fotoPath,
             id
         ]);
         

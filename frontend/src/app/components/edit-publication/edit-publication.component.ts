@@ -9,16 +9,14 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
   standalone: true,
   imports: [CommonModule, FormsModule, RouterModule],
   template: `
+    <button (click)="goBack($event)" class="floating-back-btn" title="Volver atrás">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </button>
+
     <div class="edit-pub-container">
-      <div class="breadcrumb">
-        <a (click)="goBack($event)" class="back-link" style="cursor: pointer;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          Volver atrás
-        </a>
-      </div>
 
       <h1 class="page-title">{{ isEditMode() ? 'Editar Publicación' : 'Crear Publicación' }}</h1>
 
@@ -294,25 +292,42 @@ import { MockDataService, Article, Specification } from '../../services/mock-dat
     </div>
   `,
   styles: [`
+    .floating-back-btn {
+      position: fixed;
+      top: 100px;
+      left: 40px;
+      z-index: 99;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all var(--transition-fast);
+    }
+    .floating-back-btn:hover {
+      background: var(--primary-color);
+      color: white;
+      transform: scale(1.08);
+      box-shadow: var(--shadow-lg);
+    }
+    @media (max-width: 1200px) {
+      .floating-back-btn {
+        left: 16px;
+        top: 90px;
+        width: 40px;
+        height: 40px;
+      }
+    }
+
     .edit-pub-container {
       padding-top: 10px;
-    }
-
-    .breadcrumb {
-      margin-bottom: 20px;
-    }
-
-    .back-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      color: var(--accent-color);
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .back-link:hover {
-      color: var(--accent-color-hover);
     }
 
     .page-title {
@@ -635,7 +650,7 @@ export class EditPublicationComponent implements OnInit {
   isEditMode = signal(false);
   uploadedImages = signal<string[]>([]);
   activeImageIndex = signal<number>(0);
-  selectedFile: File | null = null;
+  selectedFiles: File[] = [];
 
   private lastLoadedArticleId: string | null = null;
 
@@ -702,10 +717,11 @@ export class EditPublicationComponent implements OnInit {
     if (!input.files || input.files.length === 0) return;
 
     const files = Array.from(input.files);
-    this.selectedFile = files[0];
     
     files.forEach(file => {
       if (!file.type.startsWith('image/')) return;
+      
+      this.selectedFiles.push(file);
       
       const reader = new FileReader();
       reader.onload = () => {
@@ -730,11 +746,21 @@ export class EditPublicationComponent implements OnInit {
   removeImage(index: number, event: Event) {
     event.stopPropagation(); // stop click event from selecting this thumb
     const current = [...this.uploadedImages()];
+    const removedImg = current[index];
+    
+    if (removedImg.startsWith('data:')) {
+      // Find the corresponding file index in selectedFiles
+      let fileIndex = 0;
+      for (let i = 0; i < index; i++) {
+        if (current[i].startsWith('data:')) {
+          fileIndex++;
+        }
+      }
+      this.selectedFiles.splice(fileIndex, 1);
+    }
+    
     current.splice(index, 1);
     this.uploadedImages.set(current);
-    if (index === 0) {
-      this.selectedFile = null;
-    }
     
     // Adjust active index
     if (this.activeImageIndex() >= current.length) {
@@ -755,6 +781,11 @@ export class EditPublicationComponent implements OnInit {
     try {
       const currentId = this.articleId();
       if (this.isEditMode() && currentId) {
+        // Compute which existing images are kept (not newly uploaded base64 data URLs)
+        const keptImages = this.uploadedImages().filter(img => !img.startsWith('data:'));
+        const keptRelativePaths = keptImages.map(img => img.replace('http://localhost:3000', ''));
+        const mantenerFotos = keptRelativePaths.join(',');
+
         // Edit mode
         await this.mockService.updatePublication(currentId, {
           title: this.title,
@@ -764,8 +795,9 @@ export class EditPublicationComponent implements OnInit {
           acquisitionType: this.acquisitionType,
           price: finalPrice,
           stock: this.stock,
-          specifications: cleanSpecs
-        }, this.selectedFile || undefined);
+          specifications: cleanSpecs,
+          mantener_fotos: mantenerFotos
+        } as any, this.selectedFiles);
         alert('Publicación actualizada con éxito.');
       } else {
         // Create mode
@@ -778,13 +810,15 @@ export class EditPublicationComponent implements OnInit {
           price: finalPrice,
           stock: this.stock,
           specifications: cleanSpecs
-        }, this.selectedFile || undefined);
+        }, this.selectedFiles);
         alert('Publicación creada con éxito.');
       }
       // Go back to profile
       this.router.navigate(['/profile']);
-    } catch (error) {
-      alert('Hubo un error al procesar la publicación.');
+    } catch (error: any) {
+      console.error(error);
+      const errMsg = error.response?.data?.error || error.message || 'Error desconocido';
+      alert(`Hubo un error al procesar la publicación: ${errMsg}`);
     }
   }
 }

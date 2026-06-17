@@ -1,5 +1,5 @@
-import { Component, inject, signal, computed, effect, ChangeDetectorRef } from '@angular/core';
-import { Router, RouterModule } from '@angular/router';
+import { Component, inject, signal, computed, effect, ChangeDetectorRef, OnInit } from '@angular/core';
+import { Router, RouterModule, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MockDataService, Article } from '../../services/mock-data.service';
@@ -173,10 +173,37 @@ import { MockDataService, Article } from '../../services/mock-data.service';
       </div>
 
       <!-- User Publications list -->
-      <section class="user-pubs-section">
-        <h2 class="section-title">Mis Publicaciones</h2>
+      <section id="my-publications-section" class="user-pubs-section">
+        <div class="section-header-row" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+          <h2 class="section-title" style="margin: 0;">Mis Publicaciones</h2>
+          <div *ngIf="hasAnyPublications()" class="pub-search-wrapper" style="position: relative; min-width: 280px;">
+            <input 
+              type="text" 
+              placeholder="Buscar en mis publicaciones..." 
+              class="form-control" 
+              style="padding-left: 36px; height: 40px; border-radius: var(--border-radius-sm); font-size: 0.9rem;"
+              [ngModel]="searchPubQuery()"
+              (ngModelChange)="searchPubQuery.set($event)"
+            />
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" style="position: absolute; left: 12px; top: 12px; color: var(--text-muted);">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <button 
+              *ngIf="searchPubQuery()" 
+              (click)="searchPubQuery.set('')"
+              style="position: absolute; right: 12px; top: 10px; background: transparent; border: none; cursor: pointer; color: var(--text-muted);"
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
 
-        <div *ngIf="userPublications().length === 0" class="empty-state card-premium">
+        <!-- Case 1: No publications at all -->
+        <div *ngIf="!hasAnyPublications()" class="empty-state card-premium">
           <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
             <line x1="12" y1="8" x2="12" y2="16"></line>
@@ -187,7 +214,19 @@ import { MockDataService, Article } from '../../services/mock-data.service';
           <button routerLink="/create-publication" class="btn-accent">Publicar Componente</button>
         </div>
 
-        <div class="pubs-list">
+        <!-- Case 2: Has publications, but search filters them out -->
+        <div *ngIf="hasAnyPublications() && userPublications().length === 0" class="empty-state card-premium">
+          <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" class="empty-icon">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="8" y1="12" x2="16" y2="12"></line>
+          </svg>
+          <h3>No se encontraron publicaciones</h3>
+          <p>No hay artículos coincidentes con "{{ searchPubQuery() }}". Intenta con otro término.</p>
+          <button (click)="searchPubQuery.set('')" class="btn-primary">Mostrar todas mis publicaciones</button>
+        </div>
+
+        <!-- Case 3: List publications -->
+        <div *ngIf="userPublications().length > 0" class="pubs-list">
           <div *ngFor="let item of userPublications()" class="pub-row card-premium">
             <div class="pub-img-placeholder" [routerLink]="['/product', item.id]" style="cursor: pointer; overflow: hidden; display: flex; align-items: center; justify-content: center;">
               <img *ngIf="item.images && item.images[0] && (item.images[0].startsWith('data:') || item.images[0].startsWith('http')); else profileDefaultSvg" [src]="item.images[0]" style="width: 100%; height: 100%; object-fit: cover;" alt="Foto del componente" />
@@ -677,9 +716,10 @@ import { MockDataService, Article } from '../../services/mock-data.service';
     }
   `]
 })
-export class ProfileComponent {
+export class ProfileComponent implements OnInit {
   mockService = inject(MockDataService);
   private cdr = inject(ChangeDetectorRef);
+  private route = inject(ActivatedRoute);
 
   // Form Fields details
   name = '';
@@ -689,6 +729,9 @@ export class ProfileComponent {
   currentPassword = '';
   newPassword = '';
   confirmPassword = '';
+
+  searchPubQuery = signal('');
+  sectionParam = signal<string | null>(null);
 
   // Toast notifications details
   showToast = signal(false);
@@ -717,16 +760,44 @@ export class ProfileComponent {
         this.cdr.detectChanges();
       }
     }, { allowSignalWrites: true });
+
+    effect(() => {
+      const section = this.sectionParam();
+      const pubs = this.userPublications();
+      if (section === 'publications' && pubs.length > 0) {
+        setTimeout(() => {
+          const element = document.getElementById('my-publications-section');
+          if (element) {
+            element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+      }
+    });
   }
+
+  hasAnyPublications = computed(() => {
+    const user = this.mockService.currentUser();
+    if (!user) return false;
+    return this.mockService.publications().some(p => p.sellerId === user.id?.toString());
+  });
 
   // Calculate publications belonging to this user
   userPublications = computed(() => {
     const user = this.mockService.currentUser();
     if (!user) return [];
-    return this.mockService.publications().filter(
-      p => p.sellerEmail === user.email
+    const rawList = this.mockService.publications().filter(
+      p => p.sellerId === user.id?.toString()
     );
+    const query = this.searchPubQuery().trim().toLowerCase();
+    if (!query) return rawList;
+    return rawList.filter(p => p.title.toLowerCase().includes(query) || p.description.toLowerCase().includes(query));
   });
+
+  ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      this.sectionParam.set(params['section'] || null);
+    });
+  }
 
   onAvatarSelected(event: Event) {
     const input = event.target as HTMLInputElement;

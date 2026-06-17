@@ -117,8 +117,10 @@ exports.getUserChats = async (req, res) => {
                 p.ID_Usuario AS vendedor_id,
                 u_comp.Nombre AS comprador_nombre,
                 u_comp.Apellido_Paterno AS comprador_apellido,
+                u_comp.AvatarUrl AS comprador_avatar,
                 u_vend.Nombre AS vendedor_nombre,
-                u_vend.Apellido_Paterno AS vendedor_apellido
+                u_vend.Apellido_Paterno AS vendedor_apellido,
+                u_vend.AvatarUrl AS vendedor_avatar
             FROM Chat c
             JOIN Producto p ON c.ID_Producto = p.ID_Producto
             JOIN Usuario u_comp ON c.ID_Usuario_Inicia = u_comp.ID_Usuario
@@ -137,6 +139,7 @@ exports.getUserChats = async (req, res) => {
                 ? `${row.vendedor_nombre} ${row.vendedor_apellido}`
                 : `${row.comprador_nombre} ${row.comprador_apellido}`;
             const partnerRole = isComprador ? 'Vendedor' : 'Cliente';
+            const partnerAvatar = isComprador ? row.vendedor_avatar : row.comprador_avatar;
 
             // 3. Obtener el historial de mensajes
             const msgQuery = `
@@ -162,6 +165,7 @@ exports.getUserChats = async (req, res) => {
                 articleTitle: row.articletitle,
                 partnerName: partnerName,
                 partnerRole: partnerRole,
+                partnerAvatarUrl: partnerAvatar,
                 messages: messages
             });
         }

@@ -8,16 +8,17 @@ import { MockDataService, Article } from '../../services/mock-data.service';
   standalone: true,
   imports: [CommonModule, RouterModule],
   template: `
+    <button (click)="goBack($event)" class="floating-back-btn" title="Volver atrás">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </button>
+
     <div *ngIf="article(); else notFound" class="product-detail-container">
       <!-- Back Link / Categories -->
       <div class="breadcrumb">
-        <a (click)="goBack($event)" class="back-link" style="cursor: pointer;">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          Volver atrás
-        </a>
+        <a routerLink="/catalog" class="back-link">Catálogo</a>
         <span class="separator">/</span>
         <span class="current-category">{{ article()?.category }}</span>
       </div>
@@ -241,6 +242,40 @@ import { MockDataService, Article } from '../../services/mock-data.service';
     </ng-template>
   `,
   styles: [`
+    .floating-back-btn {
+      position: fixed;
+      top: 100px;
+      left: 40px;
+      z-index: 99;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all var(--transition-fast);
+    }
+    .floating-back-btn:hover {
+      background: var(--primary-color);
+      color: white;
+      transform: scale(1.08);
+      box-shadow: var(--shadow-lg);
+    }
+    @media (max-width: 1200px) {
+      .floating-back-btn {
+        left: 16px;
+        top: 90px;
+        width: 40px;
+        height: 40px;
+      }
+    }
+
     .product-detail-container {
       padding-top: 10px;
     }

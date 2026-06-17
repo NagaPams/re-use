@@ -1,4 +1,4 @@
-import { Injectable, signal, computed, effect } from '@angular/core';
+import { Injectable, signal, computed, effect, NgZone, inject } from '@angular/core';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 
@@ -26,6 +26,7 @@ export interface Article {
   id: string;
   title: string;
   description: string;
+  sellerId?: string;
   sellerName: string;
   sellerEmail: string;
   sellerReputation: number;
@@ -53,6 +54,7 @@ export interface Chat {
   articleTitle: string;
   partnerName: string;
   partnerRole: 'Vendedor' | 'Cliente' | 'Comprador';
+  partnerAvatarUrl?: string;
   messages: Message[];
 }
 
@@ -70,6 +72,8 @@ export interface UserProfile {
   providedIn: 'root'
 })
 export class MockDataService {
+  private zone = inject(NgZone);
+
   // Current user state (logged in user details)
   currentUser = signal<UserProfile | null>(null);
 
@@ -124,14 +128,16 @@ export class MockDataService {
       const { token, user } = res.data;
       localStorage.setItem('token', token);
       
-      this.currentUser.set({
-        id: user.id,
-        name: user.nombre + (user.apellidos ? ' ' + user.apellidos : ''),
-        email: user.correo,
-        boleta: user.boleta || '',
-        phone: user.telefono || '',
-        reputation: 5.0,
-        avatarUrl: user.avatarUrl ? `${API_BASE_URL}${user.avatarUrl}` : undefined
+      this.zone.run(() => {
+        this.currentUser.set({
+          id: user.id,
+          name: user.nombre + (user.apellidos ? ' ' + user.apellidos : ''),
+          email: user.correo,
+          boleta: user.boleta || '',
+          phone: user.telefono || '',
+          reputation: 5.0,
+          avatarUrl: user.avatarUrl ? `${API_BASE_URL}${user.avatarUrl}` : undefined
+        });
       });
 
       this.connectSocket(user.id);
@@ -152,21 +158,25 @@ export class MockDataService {
 
   logout() {
     localStorage.removeItem('token');
-    this.currentUser.set(null);
+    this.zone.run(() => {
+      this.currentUser.set(null);
+    });
   }
 
   async loadProfile() {
     try {
       const res = await api.get('/api/profile');
       const data = res.data;
-      this.currentUser.set({
-        id: data.id,
-        name: data.nombre + (data.apellidos ? ' ' + data.apellidos : ''),
-        email: data.correo,
-        boleta: data.boleta || '',
-        phone: data.telefono || '',
-        reputation: parseFloat(data.reputacion) || 5.0,
-        avatarUrl: data.avatarUrl ? `${API_BASE_URL}${data.avatarUrl}` : undefined,
+      this.zone.run(() => {
+        this.currentUser.set({
+          id: data.id,
+          name: data.nombre + (data.apellidos ? ' ' + data.apellidos : ''),
+          email: data.correo,
+          boleta: data.boleta || '',
+          phone: data.telefono || '',
+          reputation: parseFloat(data.reputacion) || 5.0,
+          avatarUrl: data.avatarUrl ? `${API_BASE_URL}${data.avatarUrl}` : undefined,
+        });
       });
 
       this.connectSocket(data.id);
@@ -188,9 +198,10 @@ export class MockDataService {
     });
 
     this.socket.on('nuevo_mensaje', (data: any) => {
-      console.log('Realtime message received:', data);
-      // Reload chat inbox to stay updated
-      this.loadChats();
+      this.zone.run(() => {
+        console.log('Realtime message received:', data);
+        this.loadChats();
+      });
     });
   }
 
@@ -198,7 +209,9 @@ export class MockDataService {
     try {
       const res = await api.get('/api/publications');
       const articles = res.data.map((p: any) => this.mapProductToArticle(p));
-      this.publications.set(articles);
+      this.zone.run(() => {
+        this.publications.set(articles);
+      });
     } catch (error) {
       console.error('Error loading publications:', error);
     }
@@ -208,7 +221,9 @@ export class MockDataService {
     try {
       const res = await api.get('/api/saved');
       const ids = res.data.map((item: any) => item.id_producto.toString());
-      this.savedIds.set(new Set(ids));
+      this.zone.run(() => {
+        this.savedIds.set(new Set(ids));
+      });
     } catch (error) {
       console.error('Error loading saved articles:', error);
     }
@@ -225,6 +240,7 @@ export class MockDataService {
           articleTitle: c.articleTitle,
           partnerName: c.partnerName,
           partnerRole: c.partnerRole,
+          partnerAvatarUrl: c.partnerAvatarUrl ? `${API_BASE_URL}${c.partnerAvatarUrl}` : undefined,
           messages: c.messages.map((m: any) => {
             let parsedText = m.text;
             let fileType = m.fileType;
@@ -254,7 +270,9 @@ export class MockDataService {
           })
         };
       });
-      this.chats.set(formattedChats);
+      this.zone.run(() => {
+        this.chats.set(formattedChats);
+      });
     } catch (error) {
       console.error('Error loading chats:', error);
     }
@@ -279,10 +297,29 @@ export class MockDataService {
     else if (p.estado === 'Vendido') mappedState = 'Vendido';
     else if (p.estado === 'Entregado') mappedState = 'Entregado';
 
+    let imageList: string[] = [];
+    if (p.fotos) {
+      if (p.fotos.startsWith('[') && p.fotos.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(p.fotos);
+          imageList = parsed.map((f: string) => `${API_BASE_URL}${f}`);
+        } catch (e) {
+          imageList = [`${API_BASE_URL}${p.fotos}`];
+        }
+      } else if (p.fotos.includes(',')) {
+        imageList = p.fotos.split(',').map((f: string) => `${API_BASE_URL}${f.trim()}`);
+      } else {
+        imageList = [`${API_BASE_URL}${p.fotos}`];
+      }
+    } else {
+      imageList = ['generic_hardware'];
+    }
+
     return {
       id: p.id_producto.toString(),
       title: p.titulo,
       description: descriptionText,
+      sellerId: p.id_usuario ? p.id_usuario.toString() : undefined,
       sellerName: p.vendedor || 'Usuario',
       sellerEmail: p.correo_institucional || '',
       sellerReputation: parseFloat(p.reputacion_vendedor) || 4.5,
@@ -291,7 +328,7 @@ export class MockDataService {
       stock: p.stock || 1,
       category: p.categoria || 'Componentes',
       state: mappedState,
-      images: p.fotos ? [`${API_BASE_URL}${p.fotos}`] : ['generic_hardware'],
+      images: imageList,
       specifications: specifications,
     };
   }
@@ -314,7 +351,9 @@ export class MockDataService {
         await api.post(`/api/saved/${articleId}`);
         current.add(articleId);
       }
-      this.savedIds.set(current);
+      this.zone.run(() => {
+        this.savedIds.set(current);
+      });
     } catch (error) {
       console.error('Failed to toggle save status:', error);
     }
@@ -336,7 +375,7 @@ export class MockDataService {
     }
   }
 
-  async addPublication(article: Omit<Article, 'id' | 'sellerName' | 'sellerEmail' | 'sellerReputation' | 'images'>, imageFile?: File) {
+  async addPublication(article: Omit<Article, 'id' | 'sellerName' | 'sellerEmail' | 'sellerReputation' | 'images'>, imageFiles?: File[]) {
     try {
       // Map category name to database ID
       const catId = this.getCategoryId(article.category);
@@ -350,8 +389,10 @@ export class MockDataService {
       formData.append('stock', article.stock.toString());
       formData.append('id_categoria', catId.toString());
       
-      if (imageFile) {
-        formData.append('imagen', imageFile);
+      if (imageFiles && imageFiles.length > 0) {
+        imageFiles.forEach(file => {
+          formData.append('imagenes', file);
+        });
       }
 
       await api.post('/api/publications', formData, {
@@ -366,7 +407,7 @@ export class MockDataService {
     }
   }
 
-  async updatePublication(articleId: string, updatedFields: Partial<Article>, imageFile?: File) {
+  async updatePublication(articleId: string, updatedFields: Partial<Article>, imageFiles?: File[]) {
     try {
       const catId = updatedFields.category ? this.getCategoryId(updatedFields.category) : 1;
       const desc = (updatedFields.description || '') + (updatedFields.specifications ? ' || ' + JSON.stringify(updatedFields.specifications) : '');
@@ -379,9 +420,15 @@ export class MockDataService {
       if (updatedFields.acquisitionType !== undefined) formData.append('tipo_adquisicion', updatedFields.acquisitionType);
       if (updatedFields.stock !== undefined) formData.append('stock', updatedFields.stock.toString());
       formData.append('id_categoria', catId.toString());
+      
+      if ((updatedFields as any).mantener_fotos !== undefined) {
+        formData.append('mantener_fotos', (updatedFields as any).mantener_fotos);
+      }
 
-      if (imageFile) {
-        formData.append('imagen', imageFile);
+      if (imageFiles && imageFiles.length > 0) {
+        imageFiles.forEach(file => {
+          formData.append('imagenes', file);
+        });
       }
       
       await api.put(`/api/publications/${articleId}`, formData, {

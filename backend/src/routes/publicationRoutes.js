@@ -25,14 +25,14 @@ const storage = multer.diskStorage({
 router.get('/', publicationController.getPublications);
 
 // POST /api/publications (Protegida, solo usuarios verificados pueden publicar)
-router.post('/', verifyToken, upload.single('imagen'), publicationController.createPublication);
+router.post('/', verifyToken, upload.array('imagenes', 10), publicationController.createPublication);
 
 // Mis publicaciones 
 router.get('/my', verifyToken, publicationController.getMyPublications);
 
 // Detalle, actualización y eliminación
 router.get('/:id', publicationController.getPublicationById);
-router.put('/:id', verifyToken, upload.single('imagen'), publicationController.updatePublication);
+router.put('/:id', verifyToken, upload.array('imagenes', 10), publicationController.updatePublication);
 router.delete('/:id', verifyToken, publicationController.deletePublication);
 // DELETE /api/publications/admin/:id
 router.delete('/admin/:id', verifyToken, verifyModerator, publicationController.deletePublicationAsAdmin);

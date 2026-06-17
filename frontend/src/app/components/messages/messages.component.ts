@@ -1,6 +1,6 @@
-import { Component, inject, signal, computed, OnInit, AfterViewChecked, ViewChild, ElementRef, effect } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, ViewChild, ElementRef, effect } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { CommonModule } from '@angular/common';
+import { CommonModule, Location } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MockDataService, Chat, Message } from '../../services/mock-data.service';
 
@@ -9,6 +9,13 @@ import { MockDataService, Chat, Message } from '../../services/mock-data.service
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
+    <button (click)="goBack($event)" class="floating-back-btn" title="Volver atrás">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+    </button>
+
     <div class="messages-container">
       <h1 class="page-title">Mensajes</h1>
 
@@ -28,11 +35,14 @@ import { MockDataService, Chat, Message } from '../../services/mock-data.service
                 (click)="selectChat(chat.id)"
                 class="chat-card"
               >
-                <div class="chat-avatar">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
+                <div class="chat-avatar" style="overflow: hidden; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                  <img *ngIf="chat.partnerAvatarUrl; else defaultAvatarSvg" [src]="chat.partnerAvatarUrl" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" />
+                  <ng-template #defaultAvatarSvg>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                  </ng-template>
                 </div>
                 <div class="chat-card-info">
                   <p class="partner-name"><strong>Alumno:</strong> {{ chat.partnerName }}</p>
@@ -53,11 +63,14 @@ import { MockDataService, Chat, Message } from '../../services/mock-data.service
                 (click)="selectChat(chat.id)"
                 class="chat-card"
               >
-                <div class="chat-avatar">
-                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
+                <div class="chat-avatar" style="overflow: hidden; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                  <img *ngIf="chat.partnerAvatarUrl; else defaultAvatarSvg" [src]="chat.partnerAvatarUrl" style="width: 100%; height: 100%; object-fit: cover;" alt="Avatar" />
+                  <ng-template #defaultAvatarSvg>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5">
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                      <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                  </ng-template>
                 </div>
                 <div class="chat-card-info">
                   <p class="partner-name"><strong>Alumno:</strong> {{ chat.partnerName }}</p>
@@ -178,6 +191,40 @@ import { MockDataService, Chat, Message } from '../../services/mock-data.service
     </div>
   `,
   styles: [`
+    .floating-back-btn {
+      position: fixed;
+      top: 100px;
+      left: 40px;
+      z-index: 99;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border-color);
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: var(--shadow-md);
+      transition: all var(--transition-fast);
+    }
+    .floating-back-btn:hover {
+      background: var(--primary-color);
+      color: white;
+      transform: scale(1.08);
+      box-shadow: var(--shadow-lg);
+    }
+    @media (max-width: 1200px) {
+      .floating-back-btn {
+        left: 16px;
+        top: 90px;
+        width: 40px;
+        height: 40px;
+      }
+    }
+
     .messages-container {
       padding-top: 10px;
     }
@@ -591,10 +638,20 @@ import { MockDataService, Chat, Message } from '../../services/mock-data.service
     }
   `]
 })
-export class MessagesComponent implements OnInit, AfterViewChecked {
+export class MessagesComponent implements OnInit {
   mockService = inject(MockDataService);
   private route = inject(ActivatedRoute);
   private router = inject(Router);
+  private location = inject(Location);
+
+  goBack(event: Event) {
+    event.preventDefault();
+    if (window.history.length > 1) {
+      this.location.back();
+    } else {
+      this.router.navigate(['/catalog']);
+    }
+  }
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
@@ -617,6 +674,14 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
         this.initialLoad = false;
       }
     }, { allowSignalWrites: true });
+
+    effect(() => {
+      const chat = this.activeChat();
+      const messagesCount = chat ? chat.messages.length : 0;
+      if (messagesCount > 0) {
+        this.scrollToBottom();
+      }
+    });
   }
 
   // Get active chat from master list
@@ -649,9 +714,7 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
     });
   }
 
-  ngAfterViewChecked() {
-    this.scrollToBottom();
-  }
+  // Removed ngAfterViewChecked as scrolling is now handled reactively via effect
 
   selectChat(id: string) {
     this.activeChatId.set(id);
@@ -672,54 +735,89 @@ export class MessagesComponent implements OnInit, AfterViewChecked {
     });
   }
 
-  onSendMessage(event: Event) {
+  async onSendMessage(event: Event) {
     event.preventDefault();
     const id = this.activeChatId();
     if (!id || !this.messageText.trim()) return;
 
-    this.mockService.sendMessage(id, this.messageText.trim());
-    this.messageText = '';
+    try {
+      await this.mockService.sendMessage(id, this.messageText.trim());
+      this.messageText = '';
+    } catch (err: any) {
+      console.error(err);
+      const errMsg = err.response?.data?.error || err.message || 'Error desconocido';
+      alert(`Error al enviar el mensaje: ${errMsg}`);
+    }
   }
 
   onFileSelected(event: Event) {
-    const input = event.target as HTMLInputElement;
-    if (!input.files || input.files.length === 0) return;
+    try {
+      const input = event.target as HTMLInputElement;
+      if (!input.files || input.files.length === 0) return;
 
-    const file = input.files[0];
-    const fileName = file.name;
-    const isImage = file.type.startsWith('image/');
-    const isPdf = file.type === 'application/pdf';
+      const file = input.files[0];
+      const fileName = file.name;
+      const fileTypeStr = file.type || '';
+      
+      const isImage = fileTypeStr.startsWith('image/') || /\.(jpe?g|png|webp|gif)$/i.test(fileName);
+      const isPdf = fileTypeStr === 'application/pdf' || /\.pdf$/i.test(fileName);
 
-    if (!isImage && !isPdf) {
-      alert('Solo se admiten archivos PDF o imágenes.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const fileUrl = reader.result as string;
-      const chatId = this.activeChatId();
-      if (chatId) {
-        this.mockService.sendMessage(
-          chatId,
-          '',
-          isImage ? 'image' : 'pdf',
-          fileUrl,
-          fileName
-        );
+      if (!isImage && !isPdf) {
+        alert('Error: Solo se admiten archivos de formato imagen (JPG, PNG, WEBP) o documentos PDF.');
+        input.value = '';
+        return;
       }
-    };
-    reader.readAsDataURL(file);
 
-    // Clear value to allow re-upload of same file
-    input.value = '';
+      const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+      if (file.size > MAX_SIZE) {
+        alert(`Error: El archivo "${fileName}" es demasiado pesado. El tamaño máximo permitido es de 10 MB (tu archivo pesa ${(file.size / (1024 * 1024)).toFixed(2)} MB).`);
+        input.value = '';
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const fileUrl = reader.result as string;
+        const chatId = this.activeChatId();
+        if (chatId) {
+          try {
+            await this.mockService.sendMessage(
+              chatId,
+              '',
+              isImage ? 'image' : 'pdf',
+              fileUrl,
+              fileName
+            );
+          } catch (err: any) {
+            console.error(err);
+            const errMsg = err.response?.data?.error || err.message || 'Error de conexión o tamaño excedido';
+            alert(`Error al subir el archivo: ${errMsg}`);
+          }
+        }
+      };
+      
+      reader.onerror = () => {
+        alert('Error: No se pudo leer el archivo seleccionado.');
+      };
+      
+      reader.readAsDataURL(file);
+
+      // Clear value to allow re-upload of same file
+      input.value = '';
+    } catch (e: any) {
+      console.error('Error in onFileSelected:', e);
+      alert(`Ocurrió un error inesperado al procesar el archivo: ${e.message}`);
+    }
   }
 
   private scrollToBottom(): void {
-    try {
-      if (this.scrollContainer) {
-        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
-      }
-    } catch(err) { }
+    setTimeout(() => {
+      try {
+        if (this.scrollContainer) {
+          const container = this.scrollContainer.nativeElement;
+          container.scrollTop = container.scrollHeight;
+        }
+      } catch(err) { }
+    }, 50);
   }
 }

@@ -50,7 +50,8 @@ app.set('io', io);
 app.set('connectedUsers', connectedUsers);
 
 app.use(cors());
-app.use(express.json()); 
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Montar rutas
@@ -63,6 +64,18 @@ app.use('/api/transactions', transactionRoutes);
 
 app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'OK', message: 'Servidor RE-USE funcionando con Postgres' });
+});
+
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('Unhandled server error:', err);
+    if (err.name === 'MulterError' || err.message?.includes('MulterError')) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+            return res.status(400).json({ error: 'El archivo es demasiado grande. El tamaño máximo permitido es de 10 MB.' });
+        }
+        return res.status(400).json({ error: `Error al subir archivo: ${err.message}` });
+    }
+    res.status(err.status || 400).json({ error: err.message || 'Error interno del servidor.' });
 });
 
 const PORT = process.env.PORT || 3000;
