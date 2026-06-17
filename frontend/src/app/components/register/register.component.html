@@ -18,7 +18,7 @@
     <div class="form-card card-premium">
       <h2 class="form-title">Registrar Usuario</h2>
 
-      <form (submit)="onRegister($event)">
+      <form (submit)="onRegister($event)" novalidate>
         <div class="form-group">
           <label for="email">Correo:</label>
           <div class="input-container">
@@ -29,9 +29,13 @@
               class="form-control"
               placeholder="correo"
               [(ngModel)]="email"
+              (input)="validateEmail(); validateConfirmEmail()"
               required
             />
             <span class="domain-badge">&#64;alumno.ipn.mx</span>
+          </div>
+          <div *ngIf="emailError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ emailError }}
           </div>
         </div>
 
@@ -45,9 +49,13 @@
               class="form-control"
               placeholder="correo"
               [(ngModel)]="confirmEmail"
+              (input)="validateConfirmEmail()"
               required
             />
             <span class="domain-badge">&#64;alumno.ipn.mx</span>
+          </div>
+          <div *ngIf="confirmEmailError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ confirmEmailError }}
           </div>
         </div>
 
@@ -60,8 +68,12 @@
             class="form-control"
             placeholder="Nombre          Paterno           Materno"
             [(ngModel)]="name"
+            (input)="validateName()"
             required
           />
+          <div *ngIf="nameError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ nameError }}
+          </div>
         </div>
 
         <div class="form-group">
@@ -73,8 +85,12 @@
             class="form-control"
             placeholder="ej. 2020081399"
             [(ngModel)]="boleta"
+            (input)="validateBoleta()"
             required
           />
+          <div *ngIf="boletaError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ boletaError }}
+          </div>
         </div>
 
         <div class="form-group">
@@ -86,8 +102,28 @@
             class="form-control"
             placeholder="************"
             [(ngModel)]="password"
+            (input)="validatePassword(); validateConfirmPassword()"
             required
           />
+          <div *ngIf="passwordError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ passwordError }}
+          </div>
+          
+          <!-- Password Strength Banner -->
+          <div *ngIf="showPasswordStrengthBanner" class="password-strength-banner" style="margin-top: 8px; padding: 12px; background-color: #f8fafc; border-radius: var(--border-radius-sm); border: 1px solid var(--border-color); font-size: 0.8rem; box-shadow: var(--shadow-sm);">
+            <p style="margin: 0 0 6px 0; font-weight: 700; color: var(--primary-color);">Formato de la contraseña:</p>
+            <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px;">
+              <li [style.color]="passLengthOk ? '#10b981' : '#ef4444'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span>{{ passLengthOk ? '✓' : '✗' }}</span> Al menos 8 caracteres
+              </li>
+              <li [style.color]="passUpperOk ? '#10b981' : '#ef4444'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span>{{ passUpperOk ? '✓' : '✗' }}</span> Al menos una letra mayúscula
+              </li>
+              <li [style.color]="passLowerOk ? '#10b981' : '#ef4444'" style="display: flex; align-items: center; gap: 6px; font-weight: 600;">
+                <span>{{ passLowerOk ? '✓' : '✗' }}</span> Al menos una letra minúscula
+              </li>
+            </ul>
+          </div>
         </div>
 
         <div class="form-group">
@@ -99,8 +135,12 @@
             class="form-control"
             placeholder="************"
             [(ngModel)]="confirmPassword"
+            (input)="validateConfirmPassword()"
             required
           />
+          <div *ngIf="confirmPasswordError" class="input-error" style="color: #ef4444; font-size: 0.82rem; margin-top: 4px; font-weight: 500;">
+            {{ confirmPasswordError }}
+          </div>
         </div>
 
         <p class="verification-note">
@@ -110,8 +150,8 @@
         <button type="submit" class="btn-primary btn-block">Registrarse</button>
       </form>
 
-      <div *ngIf="errorMessage" class="error-message" style="margin-top: 15px; color: #e11d48; text-align: center; font-size: 0.9rem; font-weight: 500;">
-        {{ errorMessage }}
+      <div *ngIf="globalError" class="error-message" style="margin-top: 15px; color: #e11d48; text-align: center; font-size: 0.9rem; font-weight: 500;">
+        {{ globalError }}
       </div>
       <div *ngIf="successMessage" class="success-message" style="margin-top: 15px; color: #10b981; text-align: center; font-size: 0.9rem; font-weight: 500;">
         {{ successMessage }}

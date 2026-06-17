@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { Router, RouterModule } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -198,6 +198,17 @@ import { MockDataService, Article } from '../../services/mock-data.service';
             </div>
           </div>
         </main>
+      </div>
+
+      <!-- Welcome Toast -->
+      <div *ngIf="showWelcomeModal()" class="welcome-toast card-premium">
+        <div class="welcome-toast-content">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" class="welcome-toast-icon">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+            <circle cx="12" cy="7" r="4"></circle>
+          </svg>
+          <span>¡Bienvenido, <strong>{{ mockService.currentUser()?.name }}</strong>!</span>
+        </div>
       </div>
     </div>
   `,
@@ -607,11 +618,68 @@ import { MockDataService, Article } from '../../services/mock-data.service';
       42% { transform: scale(1.12); }
       70% { transform: scale(1); }
     }
+
+    /* Welcome Toast Styles */
+    .welcome-toast {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--primary-color);
+      color: white;
+      padding: 14px 28px;
+      border-radius: var(--border-radius-sm);
+      box-shadow: var(--shadow-lg);
+      z-index: 3000;
+      animation: slideDownFadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .welcome-toast-content {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+
+    .welcome-toast-icon {
+      color: var(--accent-color-light);
+    }
+
+    @keyframes slideDownFadeIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+    }
   `]
 })
-export class CatalogComponent {
+export class CatalogComponent implements OnInit {
   mockService = inject(MockDataService);
   private router = inject(Router);
+
+  showWelcomeModal = signal(false);
+
+  ngOnInit() {
+    if (sessionStorage.getItem('show_welcome_modal') === 'true') {
+      this.showWelcomeModal.set(true);
+      sessionStorage.removeItem('show_welcome_modal');
+      
+      // Auto close the welcome toast after 2 seconds
+      setTimeout(() => {
+        this.showWelcomeModal.set(false);
+      }, 2000);
+    }
+  }
+
+  closeWelcomeModal() {
+    this.showWelcomeModal.set(false);
+  }
 
   // Filters State
   selectedTab = signal<string>('Todo');

@@ -8,7 +8,7 @@ exports.getProfile = async (req, res) => {
 
     try {
         const result = await db.query(
-            'SELECT ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono, Fecha_Registro FROM Usuario WHERE ID_Usuario = $1', 
+            'SELECT ID_Usuario, Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Telefono, Fecha_Registro, Boleta FROM Usuario WHERE ID_Usuario = $1', 
             [userId]
         );
 
@@ -30,6 +30,7 @@ exports.getProfile = async (req, res) => {
             telefono: user.telefono,
             fecha_registro: user.fecha_registro,
             reputacion: reputacionReal, // <- Ahora es un dato matemático real de la BD
+            boleta: user.boleta,
             avatarUrl: null  // Pendiente: Implementar carga de imágenes
         });
 

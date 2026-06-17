@@ -128,7 +128,7 @@ export class MockDataService {
         id: user.id,
         name: user.nombre + (user.apellidos ? ' ' + user.apellidos : ''),
         email: user.correo,
-        boleta: localStorage.getItem('boleta_simulated') || '',
+        boleta: user.boleta || '',
         phone: user.telefono || '',
         reputation: 5.0,
       });
@@ -140,7 +140,7 @@ export class MockDataService {
     }
   }
 
-  async register(data: { nombre: string; apellido_paterno: string; apellido_materno: string; correo: string; contrasena: string }): Promise<any> {
+  async register(data: { nombre: string; apellido_paterno: string; apellido_materno: string; correo: string; contrasena: string; boleta: string }): Promise<any> {
     try {
       const res = await api.post('/api/auth/register', data);
       return res.data;
@@ -162,7 +162,7 @@ export class MockDataService {
         id: data.id,
         name: data.nombre + (data.apellidos ? ' ' + data.apellidos : ''),
         email: data.correo,
-        boleta: localStorage.getItem('boleta_simulated') || '',
+        boleta: data.boleta || '',
         phone: data.telefono || '',
         reputation: parseFloat(data.reputacion) || 5.0,
         avatarUrl: data.avatarUrl ? `${API_BASE_URL}${data.avatarUrl}` : undefined,

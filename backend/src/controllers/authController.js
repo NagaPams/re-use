@@ -3,9 +3,7 @@ const jwt = require('jsonwebtoken');
 const db = require('../config/db');
 
 exports.register = async (req, res) => {
-    // Nota: Adaptado a las columnas de tu BD. Si tu front envía 'boleta', 
-    // debes hacer un ALTER TABLE a tu base de datos para agregarla.
-    const { nombre, apellido_paterno, apellido_materno, correo, contrasena } = req.body;
+    const { nombre, apellido_paterno, apellido_materno, correo, contrasena, boleta } = req.body;
 
     // 1. Validación estricta del dominio institucional
     if (!correo || !correo.endsWith('@alumno.ipn.mx')) {
@@ -13,10 +11,30 @@ exports.register = async (req, res) => {
     }
 
     try {
-        // 2. Verificar si el usuario ya existe
-        const userCheck = await db.query('SELECT * FROM Usuario WHERE Correo_Institucional = $1', [correo]);
-        if (userCheck.rows.length > 0) {
-            return res.status(400).json({ error: 'El correo ya está registrado.' });
+        // 2. Verificar si el usuario ya existe por correo o boleta por separado
+        const emailCheck = await db.query('SELECT * FROM Usuario WHERE Correo_Institucional = $1', [correo]);
+        const boletaCheck = boleta ? await db.query('SELECT * FROM Usuario WHERE Boleta = $1', [boleta]) : { rows: [] };
+
+        if (emailCheck.rows.length > 0 && boletaCheck.rows.length > 0) {
+            return res.status(400).json({ 
+                error: 'El correo electrónico y la boleta ya están registrados.',
+                emailExists: true,
+                boletaExists: true
+            });
+        }
+        if (emailCheck.rows.length > 0) {
+            return res.status(400).json({ 
+                error: 'El correo ya está registrado.',
+                emailExists: true,
+                boletaExists: false
+            });
+        }
+        if (boletaCheck.rows.length > 0) {
+            return res.status(400).json({ 
+                error: 'La boleta ya está registrada.',
+                emailExists: false,
+                boletaExists: true
+            });
         }
 
         // 3. Hashear la contraseña (Factor de costo: 10)
@@ -25,10 +43,10 @@ exports.register = async (req, res) => {
 
         // 4. Insertar en PostgreSQL (usando RETURNING para obtener el ID generado)
         const insertQuery = `
-            INSERT INTO Usuario (Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Contrasena)
-            VALUES ($1, $2, $3, $4, $5) RETURNING ID_Usuario;
+            INSERT INTO Usuario (Nombre, Apellido_Paterno, Apellido_Materno, Correo_Institucional, Contrasena, Boleta)
+            VALUES ($1, $2, $3, $4, $5, $6) RETURNING ID_Usuario;
         `;
-        const result = await db.query(insertQuery, [nombre, apellido_paterno, apellido_materno, correo, hashedPassword]);
+        const result = await db.query(insertQuery, [nombre, apellido_paterno, apellido_materno, correo, hashedPassword, boleta]);
         const newUserId = result.rows[0].id_usuario;
 
         // 5. Simular el envío de correo (MVP)
@@ -130,7 +148,8 @@ exports.login = async (req, res) => {
                 nombre: user.nombre,
                 apellidos: `${user.apellido_paterno} ${user.apellido_materno}`,
                 correo: user.correo_institucional,
-                telefono: user.telefono
+                telefono: user.telefono,
+                boleta: user.boleta
             }
         });
 
