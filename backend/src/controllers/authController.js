@@ -1,6 +1,7 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const db = require('../config/db');
+const emailService = require('../services/emailService');
 
 exports.register = async (req, res) => {
     const { nombre, apellido_paterno, apellido_materno, correo, contrasena, boleta } = req.body;
@@ -49,11 +50,17 @@ exports.register = async (req, res) => {
         const result = await db.query(insertQuery, [nombre, apellido_paterno, apellido_materno, correo, hashedPassword, boleta]);
         const newUserId = result.rows[0].id_usuario;
 
-        // 5. Simular el envío de correo (MVP)
+        // 5. Enlace de activación
         const verifyToken = jwt.sign({ id: newUserId }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        const activationLink = `http://localhost:3000/api/auth/verify/${verifyToken}`;
         
-        // En producción, aquí va Nodemailer. Por ahora, lo imprimimos en consola.
-        console.log(`[MVP SIMULACIÓN EMAIL] Enlace de validación para ${correo}: http://localhost:3000/api/auth/verify/${verifyToken}`);
+        // Simulación en consola (mantenida para facilidad de pruebas)
+        console.log(`[MVP SIMULACIÓN EMAIL] Enlace de validación para ${correo}: ${activationLink}`);
+
+        // Enviar correo real asíncronamente (de fondo)
+        emailService.sendVerificationEmail(correo, nombre, activationLink).catch(err => {
+            console.error('Nodemailer background verification send error:', err);
+        });
 
         // Respuesta 202 Accepted según nuestra corrección arquitectónica
         res.status(202).json({ 
@@ -179,7 +186,15 @@ exports.forgotPassword = async (req, res) => {
             { expiresIn: '15m' }
         );
 
-        console.log(`[MVP SIMULACIÓN EMAIL] Enlace de recuperación para ${correo}: http://localhost:4200/reset-password?token=${resetToken}`);
+        const resetLink = `http://localhost:4200/reset-password?token=${resetToken}`;
+
+        // Simulación en consola (mantenida para facilidad de pruebas)
+        console.log(`[MVP SIMULACIÓN EMAIL] Enlace de recuperación para ${correo}: ${resetLink}`);
+
+        // Enviar correo real asíncronamente (de fondo)
+        emailService.sendPasswordResetEmail(correo, user.nombre || 'Usuario', resetLink).catch(err => {
+            console.error('Nodemailer background password reset send error:', err);
+        });
 
         res.status(200).json({ 
             message: 'Si el correo está registrado, se enviará un enlace de recuperación.' 
